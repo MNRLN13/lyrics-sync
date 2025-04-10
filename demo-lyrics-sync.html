@@ -1,0 +1,101 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Синхронизация текста с аудио</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: auto; }
+    textarea { width: 100%; height: 150px; margin-bottom: 10px; }
+    button { padding: 10px 20px; font-size: 16px; margin: 5px 0; }
+    .line { margin-bottom: 5px; }
+  </style>
+</head>
+<body>
+  <h2>Синхронизация текста с аудио и экспорт в TTML</h2>
+
+  <label>Ссылка на аудиофайл (mp3):</label><br>
+  <input id="audioSrc" type="text" value="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" style="width:100%; margin-bottom:10px;"><br>
+
+  <audio id="player" controls style="width:100%; margin-bottom: 10px;"></audio>
+
+  <label>Вставьте текст (по строкам):</label><br>
+  <textarea id="lyricsInput" placeholder="Текст первой строки
+Текст второй строки
+..."></textarea><br>
+  <button onclick="loadLines()">Загрузить строки</button>
+
+  <div id="syncArea"></div>
+
+  <button onclick="downloadTTML()">Скачать TTML</button>
+
+  <script>
+    const player = document.getElementById('player');
+    const audioSrc = document.getElementById('audioSrc');
+
+    audioSrc.addEventListener('change', () => {
+      player.src = audioSrc.value;
+    });
+    player.src = audioSrc.value;
+
+    let lines = [];
+    function loadLines() {
+      const input = document.getElementById('lyricsInput').value;
+      const container = document.getElementById('syncArea');
+      container.innerHTML = '';
+      lines = input.split('\n').map((text, i) => ({ text, begin: '', end: '' }));
+
+      lines.forEach((line, index) => {
+        const div = document.createElement('div');
+        div.className = 'line';
+        div.innerHTML = `
+          <b>${line.text}</b><br>
+          <button onclick="setBegin(${index})">Начало</button>
+          <button onclick="setEnd(${index})">Конец</button>
+          <span id="time-${index}"></span>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function formatTime(seconds) {
+      const ms = String((seconds % 1).toFixed(3)).substring(2);
+      const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+      const m = Math.floor((seconds / 60) % 60).toString().padStart(2, '0');
+      const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
+      return `${h}:${m}:${s}.${ms}`;
+    }
+
+    function setBegin(index) {
+      lines[index].begin = formatTime(player.currentTime);
+      updateTimeDisplay(index);
+    }
+
+    function setEnd(index) {
+      lines[index].end = formatTime(player.currentTime);
+      updateTimeDisplay(index);
+    }
+
+    function updateTimeDisplay(index) {
+      document.getElementById(`time-${index}`).innerText =
+        ` [${lines[index].begin} - ${lines[index].end}]`;
+    }
+
+    function downloadTTML() {
+      let ttml = `<tt xmlns="http://www.w3.org/ns/ttml">\n  <body>\n    <div>\n`;
+      lines.forEach(line => {
+        if (line.begin && line.end) {
+          ttml += `      <p begin="\${line.begin}" end="\${line.end}">\${line.text}</p>\n`;
+        }
+      });
+      ttml += `    </div>\n  </body>\n</tt>`;
+
+      const blob = new Blob([ttml], { type: 'application/xml' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'lyrics.ttml';
+      a.click();
+    }
+  </script>
+</body>
+</html>
